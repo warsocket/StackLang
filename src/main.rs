@@ -12,13 +12,46 @@ fn main() {
     let mut args = env::args();
     args.next();
 
-    let filename = match args.next(){
-        Some(n) => n,
-        None => {
-            eprintln!("No filename specified");
-            exit(1);
+    let mut debug = false;
+    let params:Vec<String> = args.collect();
+    let mut filename = "".to_owned();
+
+    // println!("{}", fil)
+
+    for p in params{
+        let param = p.as_str();
+
+        if param.starts_with("--"){
+            match(param){
+                "--debug" => {
+                    debug = true;
+                },
+                "--compile" => {
+                    todo!("comile to bytecode");
+                },
+                "--bytecode" => {
+                    todo!("run bytecode");
+                },
+                _ => {
+                    eprintln!("Unknown option '{}' !", param);
+                    exit(1);
+                }
+            }   
+        }else{
+            if filename != ""{
+                eprintln!("Only one filename allowed!");
+                exit(1);                    
+            }
+            filename = p;         
         }
-    };
+
+
+    }
+
+    if filename == ""{
+        eprintln!("No filename specified!");
+        exit(1);
+    }
 
     let mut file = match File::open(filename)
     {
@@ -76,13 +109,13 @@ fn main() {
         }
     }
 
-    run(&pure_script)
+    run(&pure_script, debug)
 
 }
 
 const STACK_ZERO:&str = "Error: Stack Empty.";
 
-fn run(code:&Vec<u8>){
+fn run(code:&Vec<u8>, debug:bool){
 
     if code.len() == 0{return}
 
@@ -118,8 +151,11 @@ fn run(code:&Vec<u8>){
     loop{
         let stack: &mut Vec<i64> = stackmap.get_mut(&stackindex).expect("INTERPRETER's FAULT: Stackindex should always be valid!");
         step = true; //all stuff steps except for one so we just set it boforehand
-        // println!("{}{:?} reg={}", stackindex, &stack, reg);
-        // println!("{}", code[index] as char);
+
+        if debug{
+            eprintln!("{}{:?} reg={}", stackindex, &stack, reg);
+            eprintln!("{}", code[index] as char);
+        }
 
         match(code[index]){
             b'(' => {
@@ -211,6 +247,7 @@ fn run(code:&Vec<u8>){
         if (index<0) | (index >= code.len()) {break}
     }
 
-    // println!("{}{:?} reg={}", stackindex, stackmap.get_mut(&stackindex).unwrap(), reg);
+    if debug{eprintln!("{}{:?} reg={}", stackindex, stackmap.get_mut(&stackindex).unwrap(), reg);}
+    
 
 }
