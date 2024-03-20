@@ -11,7 +11,7 @@ const TOKENS:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
     b')', // POP to reg
     b'+', // ADD
     b'-', // SUB
-    b'*', // MUL
+    b'*', // MUL (returns 2 stack numbners)
     b'/', // DIV
     b'|', // OR
     b'&', // AND
@@ -20,7 +20,7 @@ const TOKENS:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
     b'1', // SHL 1; | 1
     b'0', // SHL 1
     b'$', // FUNCTION
-    b'@', // JUMP
+    b'@', // JUMP (0 == NOP)
     b'=', // TEST (set flags for greater smaller etc), 0 result = same
     b':', // SWITCH TO STACK #
 ]; //Jumping outsid eof the array of instruction = HALT
@@ -235,7 +235,7 @@ fn run(code:&Vec<u8>, debug:bool){
 
         if debug{
             eprintln!("{}{:?} reg={}", stackindex, &stack, reg);
-            eprintln!("{}", code[index] as char);
+            eprintln!("{:#018X}: {}", index, code[index] as char);
         }
 
         match(code[index]){
@@ -265,9 +265,7 @@ fn run(code:&Vec<u8>, debug:bool){
             b'/' => {
                 let b = stack.pop().oos();
                 let a = stack.pop().oos();
-                let x = i128::from(a)/i128::from(b);
-                stack.push((x >> 64) as i64);
-                stack.push(x as i64);
+                stack.push(a/b);
             }
             b'|' => {
                 let b = stack.pop().oos();
@@ -301,9 +299,12 @@ fn run(code:&Vec<u8>, debug:bool){
                 stack.push( func_matrix[reg as usize](a) );
             }
             b'@' => {
+                //JMP 0 = NOP and advances 1
                 let a = stack.pop().oos();
-                index = a as usize;
-                step = false;
+                if a != 0{
+                    step = false;    
+                    index = a as usize + index;
+                }
             }
             b'=' => {
                 // last 2 bits contain flags [negative, non-zero]
