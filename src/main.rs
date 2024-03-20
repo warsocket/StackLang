@@ -77,8 +77,8 @@ fn main() {
 
     let mut pure_script:Vec<u8> = vec!();
     const valid_tokens:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
-        b'(', // PUSH(0)
-        b')', // POP
+        b'(', // PUSH(reg)
+        b')', // POP to reg
         b'+', // ADD
         b'-', // SUB
         b'*', // MUL

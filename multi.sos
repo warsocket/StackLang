@@ -1,4 +1,4 @@
-#!./target/release/stacklang
+#!./target/release/stackofstacks
 
 # stack 0 contains [1], stack 1 contains [2]
 (1)((:
