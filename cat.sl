@@ -1,0 +1,5 @@
+#!./target/release/stacklang
+($ 		push zero and then READ
+(1)$	set reg from zero to 1, and write
+((^)	reset reg to 0
+(@		jump to start of program 
