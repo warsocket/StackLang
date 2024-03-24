@@ -7,22 +7,22 @@ use std::io::{Read, Write, stdin, stdout, stderr};
 use std::collections::HashMap;
 
 const TOKENS:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
-    b'(', // PUSH(reg)
-    b')', // POP to reg
+    b'[', // PUSH(reg)
+    b']', // POP to reg
     b'+', // ADD
     b'-', // SUB
     b'*', // MUL (returns 2 stack numbners)
-    b'/', // DIV
+    b'/', // DIV (/0  = 0, can be used for test by performing x/x (0 when equal 1 when not equal))
     b'|', // OR
     b'&', // AND
     b'^', // XOR
-    b'!', // NOT
+    b'!', // HIGH ALL write new value to stack with all bits set to 1 (-1)
     b'1', // SHL 1; | 1
     b'0', // SHL 1
-    b'$', // FUNCTION
-    b'@', // JUMP (0 == NOP)
-    b'=', // TEST (set flags for greater smaller etc), 0 result = same
-    b':', // SWITCH TO STACK #
+    b'$', // SPECIAL FUNCTION (reserved)
+    b'@', // SKIP aka JUMP (how much to jump extra after CP increases)
+    b'<', // READ
+    b'>', // WRITE
 ]; //Jumping outsid eof the array of instruction = HALT
 
 fn main() {
@@ -49,6 +49,12 @@ fn main() {
 
         if param.starts_with("--"){
             match(param){
+                "--help" => {
+                    eprintln!("Usage stackofstacks [--debug, --compile, --bytecode] FILENAME");
+                    eprintln!("  --debug     Shows debug / trace on STDERR while runniogn program");
+                    eprintln!("  --compile   Compiles program to bytecode (emitted on STDOUT)");
+                    eprintln!("  --bytecode  Runs compiled bytecode instead of text");
+                },                
                 "--debug" => {
                     debug = true;
                 },
@@ -186,6 +192,7 @@ impl Oos for Option<i64>{
         match(self){
             Some(v) => *v,
             None => {
+                // 0 //by design reading form enpty stack reads all 0's
                 eprintln!("{}", STACK_ZERO);
                 exit(1);
             }
@@ -200,50 +207,45 @@ fn run(code:&Vec<u8>, debug:bool){
 
     if code.len() == 0{return}
 
-    let mut reg:i64 = 0;
     let mut index = 0;
-    let mut step = true;
+    let mut ram:HashMap<i64, i64> = HashMap::new();
 
-    let mut stackmap:HashMap<i64, Vec<i64>> = HashMap::new();
-    let mut stackindex:i64 = 0;
+    // let func_matrix:[&dyn Fn(i64) -> i64;3] = [
+    //     &|a| {
+    //     let mut buffer:[u8;1] = [0];
+    //     stdin().lock().read_exact(&mut buffer);
+    //     buffer[0] as i64
+    //     }, //STDIN READ BYTE
+    //     &|a| {
+    //         let buffer:[u8;1] = [a as u8];
+    //         stdout().lock().write(&buffer).expect("Write Error") as i64;
+    //         1i64 //
+    //     }, //STDOUT WRITE BYTE
+    //     &|a| {
+    //         let buffer:[u8;1] = [a as u8];
+    //         stderr().lock().write(&buffer).expect("Write Error") as i64;
+    //         2i64            
+    //     }, //STDERR WRITE BYTE
+    // ];
 
-    stackmap.insert(stackindex, vec!());
- 
-
-
-    let func_matrix:[&dyn Fn(i64) -> i64;3] = [
-        &|a| {
-        let mut buffer:[u8;1] = [0];
-        stdin().lock().read_exact(&mut buffer);
-        buffer[0] as i64
-        }, //STDIN READ BYTE
-        &|a| {
-            let buffer:[u8;1] = [a as u8];
-            stdout().lock().write(&buffer).expect("Write Error") as i64;
-            1i64 //
-        }, //STDOUT WRITE BYTE
-        &|a| {
-            let buffer:[u8;1] = [a as u8];
-            stderr().lock().write(&buffer).expect("Write Error") as i64;
-            2i64            
-        }, //STDERR WRITE BYTE
-    ];
+    let mut stack: Vec<i64> = vec!();
 
     loop{
-        let stack: &mut Vec<i64> = stackmap.get_mut(&stackindex).expect("INTERPRETER's FAULT: Stackindex should always be valid!");
-        step = true; //all stuff steps except for one so we just set it boforehand
 
         if debug{
-            eprintln!("{}{:?} reg={}", stackindex, &stack, reg);
+            eprintln!("{:?}", &stack);
             eprintln!("{:#018X}: {}", index, code[index] as char);
         }
 
         match(code[index]){
-            b'(' => {
-                stack.push(reg);
+            b'[' => { // PUSH to stack form ram (read from ram) stack: [ptr] -> [value]
+                let ptr = stack.pop().oos();
+                stack.push( *ram.get(&ptr).or(Some(&0)).unwrap() ); //non written emmeory = 0
             }
-            b')' => {
-                reg = stack.pop().oos();
+            b']' => { // POP stack to ram (write to ram) stack: [value, ptr] -> []
+                let ptr = stack.pop().oos();
+                let value = stack.pop().oos();
+                ram.insert(ptr, value);
             }
             b'+' => {
                 let b = stack.pop().oos();
@@ -255,17 +257,21 @@ fn run(code:&Vec<u8>, debug:bool){
                 let a = stack.pop().oos();
                 stack.push( (Wrapping(a)-Wrapping(b)).0 );
             }
-            b'*' => {
+            b'*' => { // MULTIPLY stack:[a,b] -> [low, high]
                 let b = stack.pop().oos();
                 let a = stack.pop().oos();
                 let x = i128::from(a)*i128::from(b);
-                stack.push((x >> 64) as i64);
                 stack.push(x as i64);
+                stack.push((x >> 64) as i64);
             }
             b'/' => {
                 let b = stack.pop().oos();
                 let a = stack.pop().oos();
-                stack.push(a/b);
+                if b != 0{
+                    stack.push(a/b);
+                }else{
+                    stack.push(0); //div by 0 is 0 by design (can replace test)
+                }
             }
             b'|' => {
                 let b = stack.pop().oos();
@@ -283,8 +289,7 @@ fn run(code:&Vec<u8>, debug:bool){
                 stack.push( a ^ b );
             }
             b'!' => {
-                let a = stack.pop().oos();
-                stack.push( !a );
+                stack.push( -1 );
             }
             b'1' => {
                 let a = stack.pop().oos();
@@ -295,41 +300,57 @@ fn run(code:&Vec<u8>, debug:bool){
                 stack.push((a << 1));
             }
             b'$' => {
-                let a = stack.pop().oos();
-                stack.push( func_matrix[reg as usize](a) );
+                // Reserved for special functions (opening files and such)
+                // its NOOP now, but dont count on that in the future (might also consume more stack etc)
             }
             b'@' => {
-                //JMP 0 = NOP and advances 1
                 let a = stack.pop().oos();
-                if a != 0{
-                    step = false;    
-                    index = a as usize + index;
-                }
+                index += a as usize;
             }
-            b'=' => {
-                // last 2 bits contain flags [negative, non-zero]
-                let a = stack.pop().oos();
-                stack.push( ((a<0) as i64) <<1 | (a==0) as i64 )
-            }
-            b':' => {
-                let a = stack.pop().oos();
-                if stack.len() == 0 { stackmap.remove(&stackindex); } //prune empty maps you leave
+            b'<' => { //READ BYTE stack: [fp] -> [char]
+                let fp = stack.pop().oos();
 
-                if !stackmap.contains_key(&a){
-                    stackmap.insert(a, vec!());
+                match fp{
+                    0 => {
+                        let mut buffer:[u8;1] = [0];
+                        stdin().lock().read_exact(&mut buffer);
+                        stack.push(buffer[0] as i64);
+                    }
+                    _ => {
+                        eprintln!("ERROR: Wrong fd for READ, for now only 0 STDIN is implemented!");
+                        exit(1);                        
+                    }
                 }
-                stackindex = a;
+            }
+            b'>' => { //WRITE BYTE stack: [ch, fp] -> []
+                let fp = stack.pop().oos();
+                let ch = stack.pop().oos();
+
+                match fp{
+                    1 => {
+                        let buffer:[u8;1] = [ch as u8];
+                        stdout().lock().write(&buffer).expect("STDOUT Write Error");                    
+                    }
+                    2 =>{
+                        let buffer:[u8;1] = [ch as u8];
+                        stderr().lock().write(&buffer).expect("STDERR Write Error");                            
+                    }
+                    _ => {
+                        eprintln!("ERROR: Wrong fd for WRITE, for now only 1 STDOUT and 2 STDERR is implemented!");
+                        exit(1);                        
+                    }
+                }
             }            
             _ => {
                 panic!("INTERPRETER's FAULT: Invalid token!")
             }
         }
 
-        if step {index += 1};
+        index += 1;
         if (index<0) | (index >= code.len()) {break}
     }
 
-    if debug{eprintln!("{}{:?} reg={}", stackindex, stackmap.get_mut(&stackindex).unwrap(), reg);}
+    if debug{eprintln!("{:?}", &stack);}
     
 
 }

@@ -1,5 +1,4 @@
 #!./target/release/stackofstacks
-($ 		push zero and then READ
-(1)$	set reg from zero to 1, and write
-((^)	reset reg to 0
-(@		jump to start of program 
+!!^< 	push zero and then READ
+!!^1>	add FP and WRITE
+!0001@	jump to start of program

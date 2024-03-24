@@ -2,23 +2,4 @@
 # conditional jump demo:  iff (A<B) write 0 else 1
 # Change A and B and optionally check with --debug
 
-#(0110		# A
-#(1110		# A
-#(0111		# B
-
-# read 2 bytes from stdin, easay test tip: "ab" = 0 while "ba" = 1
-($($
-
--=			# compare
-(10/		# /2
-(100		# jmp +3
-*^@			# calc offset, squash to 1 u64 from u128 (when top part is 0), then jump
-(1)			# set reg to 1
-(			# pushes 0 when jumped, or 1 when not jumped
-
-# Printing routine (1 digit)
-((^)		# Clear reg to 0
-(110000		# ascii "0"
-+			# add ascii "0" (so we can write value from 0-9)
-(1)			# reg to 1
-$			# WRITE (reg was still 1)
+#TODO
