@@ -346,7 +346,7 @@ fn run(code:&Vec<u8>, debug:bool){
             }
         }
 
-        index += 1;
+        index = (Wrapping(index)+Wrapping(1usize)).0;
         if (index<0) | (index >= code.len()) {break}
     }
 
