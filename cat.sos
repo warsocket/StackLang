@@ -1,4 +1,7 @@
 #!./target/release/stackofstacks
-!!^< 	push zero and then READ
-!!^1>	add FP and WRITE
-!0001@	jump to start of program
+
+!!^< 		push zero and then READ
+			# We will need to implement eof later
+!!^1>		add FP and WRITE
+!]			# Trash value to ram[-1] We will might implement write errors later
+!01110@		jump to start of program

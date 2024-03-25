@@ -2,4 +2,12 @@
 # conditional jump demo:  iff (A<B) write 0 else 1
 # Change A and B and optionally check with --debug
 
-#TODO
+# ! 0000000000000000000000000000000000000000000000000000000000000011 # write A to stack
+# ! 0000000000000000000000000000000000000000000000000000000000000010 # write B to stack
+
+#!!^ 11 # write A=3 to stack
+#!!^ 10 # write B=2 to stack
+#-
+
+!!**]	#ram[0] = 0
+ 

@@ -7,22 +7,26 @@ use std::io::{Read, Write, stdin, stdout, stderr};
 use std::collections::HashMap;
 
 const TOKENS:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
-    b'[', // PUSH(reg)
-    b']', // POP to reg
+    b'!', // HIGH ALL write new value to stack with all bits set to 1 (-1)
+    b'^', // XOR
+    b'|', // OR
+    b'&', // AND
+
     b'+', // ADD
     b'-', // SUB
     b'*', // MUL (returns 2 stack numbners)
     b'/', // DIV (/0  = 0, can be used for test by performing x/x (0 when equal 1 when not equal))
-    b'|', // OR
-    b'&', // AND
-    b'^', // XOR
-    b'!', // HIGH ALL write new value to stack with all bits set to 1 (-1)
-    b'1', // SHL 1; | 1
-    b'0', // SHL 1
-    b'$', // SPECIAL FUNCTION (reserved)
-    b'@', // SKIP aka JUMP (how much to jump extra after CP increases)
+
+    b'[', // PUSH(reg)
+    b']', // POP to reg
     b'<', // READ
     b'>', // WRITE
+
+    b'0', // SHL 1
+    b'1', // SHL 1; | 1
+    b'@', // SKIP aka JUMP (how much to jump extra after CP increases)
+    b'$', // SPECIAL FUNCTION (reserved)
+
 ]; //Jumping outsid eof the array of instruction = HALT
 
 fn main() {
@@ -305,7 +309,7 @@ fn run(code:&Vec<u8>, debug:bool){
             }
             b'@' => {
                 let a = stack.pop().oos();
-                index += a as usize;
+                index = (Wrapping(index)+Wrapping(a as usize)).0;
             }
             b'<' => { //READ BYTE stack: [fp] -> [char]
                 let fp = stack.pop().oos();
@@ -313,8 +317,11 @@ fn run(code:&Vec<u8>, debug:bool){
                 match fp{
                     0 => {
                         let mut buffer:[u8;1] = [0];
-                        stdin().lock().read_exact(&mut buffer);
-                        stack.push(buffer[0] as i64);
+                        let stack_value = match stdin().lock().read_exact(&mut buffer){
+                            Ok(_) => buffer[0] as i64,
+                            Err(_) => -1,   
+                        };
+                        stack.push(stack_value);
                     }
                     _ => {
                         eprintln!("ERROR: Wrong fd for READ, for now only 0 STDIN is implemented!");
@@ -329,11 +336,23 @@ fn run(code:&Vec<u8>, debug:bool){
                 match fp{
                     1 => {
                         let buffer:[u8;1] = [ch as u8];
-                        stdout().lock().write(&buffer).expect("STDOUT Write Error");                    
+                        let ret = stdout().lock().write(&buffer);
+                        stack.push(
+                            match ret{
+                                Ok(_) => 0i64,
+                                Err(_) => -1i64,
+                            }
+                        )
                     }
                     2 =>{
                         let buffer:[u8;1] = [ch as u8];
-                        stderr().lock().write(&buffer).expect("STDERR Write Error");                            
+                        let ret = stderr().lock().write(&buffer);
+                        stack.push(
+                            match ret{
+                                Ok(_) => 0i64,
+                                Err(_) => -1i64,
+                            }
+                        )
                     }
                     _ => {
                         eprintln!("ERROR: Wrong fd for WRITE, for now only 1 STDOUT and 2 STDERR is implemented!");
