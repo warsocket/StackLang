@@ -1,7 +1,15 @@
 #!./target/release/stackofstacks
 
-!!^< 		push zero and then READ
-			# We will need to implement eof later
-!!^1>		add FP and WRITE
-!]			# Trash value to ram[-1] We will might implement write errors later
-!01110@		jump to start of program
+!!^< 			push zero and then READ
+!!^]			#store in ram[0]
+
+#EOF implementation
+!!^[			#read char
+!-!]![![		#char--1 and put that result on stack twicee
+/0@				#if char was -1(ERROR) stack now is 0, else is 1 (then x2 the jump that amount)
+!@				#exit when jump 0 (on read ERROR)
+
+!!^[			#read char
+!!^1>			add FP and WRITE
+!]				# Trash value to ram[-1] We will might implement write errors later
+!!^101111!^@	#jump to start of program

@@ -17,13 +17,14 @@ const TOKENS:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
     b'*', // MUL (returns 2 stack numbners)
     b'/', // DIV (/0  = 0, can be used for test by performing x/x (0 when equal 1 when not equal))
 
-    b'[', // PUSH(reg)
-    b']', // POP to reg
-    b'<', // READ
-    b'>', // WRITE
+    b'[', // PUSH ram[offset] to stack
+    b']', // POP stack value to ram[offset]
+    b'<', // READ fs to stack
+    b'>', // WRITE write byte to fs
 
     b'0', // SHL 1
     b'1', // SHL 1; | 1
+
     b'@', // SKIP aka JUMP (how much to jump extra after CP increases)
     b'$', // SPECIAL FUNCTION (reserved)
 
@@ -309,6 +310,7 @@ fn run(code:&Vec<u8>, debug:bool){
             }
             b'@' => {
                 let a = stack.pop().oos();
+                if a == -1 {break} // This would lead to perpetual spinlock basically haling ,execution, so better make it an exit strategy
                 index = (Wrapping(index)+Wrapping(a as usize)).0;
             }
             b'<' => { //READ BYTE stack: [fp] -> [char]

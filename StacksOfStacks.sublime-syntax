@@ -1,0 +1,29 @@
+%YAML 1.2
+---
+file_extensions: [sos]
+
+scope: comment
+contexts:
+  main:
+    - match: '#'
+      push: line_comment
+
+    - match: '[\^\|&*/+\-<>]'
+      scope: variable.function
+
+    - match: '[$]'
+      scope: invalid.reserved
+
+    - match: '[\!@]'
+      scope: keyword
+
+    - match: '[\[\]]'
+      scope: storage
+
+    - match: '[01]+'
+      scope: constant
+
+  line_comment:
+    - meta_scope: comment.line
+    - match: $
+      pop: true

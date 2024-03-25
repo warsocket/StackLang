@@ -1,7 +1,0 @@
-#!./target/release/stackofstacks
-# Memory access
-
-!!^ 	#clear a stack place for number
-1		# write the number
-!!^] 	# write the number to offset 0
-!!^[ 	#read form offset 0 
