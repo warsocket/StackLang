@@ -8,16 +8,16 @@ contexts:
     - match: '#'
       push: line_comment
 
-    - match: '[\^\|&*/+\-<>]'
+    - match: '[\^\|&*/+\-]'
       scope: variable.function
 
-    - match: '[$]'
-      scope: invalid.reserved
+    # - match: '[$]'
+      # scope: invalid.reserved
 
-    - match: '[\!@]'
+    - match: '[\!@~=$]'
       scope: keyword
 
-    - match: '[\[\]]'
+    - match: '[\.\?]'
       scope: storage
 
     - match: '[01]+'

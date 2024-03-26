@@ -1,26 +1,7 @@
 #!./target/release/stackofstacks --strict
 
-#we use ram[-1] for quick 0 access ![ vs !!^
-!!^!]					#load 0 into ram[-1], this prevents stric mode failure
+!!^1111		#init loop counter
 
-![0101010![10]			#store char in ram[2]
-![0001111![]				#store 15 in ram[0]
-
-# program will now write ram[2] char ram[0] times
-
-
-#write *
-![10[![1> ![11]			#trash to ram[3]
-
-#ram[0] -= 1
-![[ 					#load ram[0]
-!+						#-1
-![]						#store in ram[0]
-
-#ram[0] JNZ to write
-![[						#load ram[0]
-![[						#load ram[0]
-/						#0 iff ram[0] == 0 else 1
-
-![101000*				#
-!^@						#jump to start
+!+			#-1
+==/			#check if zero
+!0100*@		#JNZ -12
