@@ -1,6 +1,7 @@
-#!./target/release/stackofstacks
+#!./target/release/stackofstacks --strict
 
 #we use ram[-1] for quick 0 access ![ vs !!^
+!!^!]					#load 0 into ram[-1], this prevents stric mode failure
 
 ![0101010![10]			#store char in ram[2]
 ![0001111![]				#store 15 in ram[0]
@@ -21,6 +22,5 @@
 ![[						#load ram[0]
 /						#0 iff ram[0] == 0 else 1
 
-![101101*				#
-![11]					#trash high part
+![101000*				#
 !^@						#jump to start

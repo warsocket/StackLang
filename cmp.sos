@@ -1,8 +1,8 @@
-#!./target/release/stackofstacks
+#!./target/release/stackofstacks --strict
 # Writes relation between 2 numbers to terminal
 
-# !1000000000000000000000000000000000000000000000000000000000000000	 !!^1]
-!00000000!]![![*!]!]![![*!]!]![!!^10/!]![![*!]0	 !!^1]	#store 1000....  in ram[1] (same as above only faster)
+!1000000000000000000000000000000000000000000000000000000000000000	 !!^1]
+#!00000000!]![![*!]!]![![*!]!]![!!^10/!]![![*!]0	 !!^1]	#store 1000....  in ram[1] (same as above only faster)
 
 # ! 0000000000000000000000000000000000000000000000000000000000000011 # write A=1 to stack
 # ! 0000000000000000000000000000000000000000000000000000000000000010 # write B=2 to stack
@@ -23,14 +23,14 @@
 !!^1[&		#signed bit or nothing
 !!^1[/		#1 iff B>A else 0
 
-!!^1000010*!]@	#jump this far forward when B>A
+!!^1000000*@	#jump this far forward when B>A
 # A>B or A==B
 
 !!^10[
 !!^11[
 -
 !]![![/		#0 if equal else 1
-!!^10000*!]@
+!!^10000*@
 
 #A == B write '='
 !!^111101

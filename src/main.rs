@@ -36,6 +36,8 @@ fn main() {
     args.next();
 
     let mut debug = false;
+    let mut strict = false;
+
     let params:Vec<String> = args.collect();
     let mut filename = "".to_owned();
 
@@ -57,12 +59,16 @@ fn main() {
                 "--help" => {
                     eprintln!("Usage stackofstacks [--debug, --compile, --bytecode] FILENAME");
                     eprintln!("  --debug     Shows debug / trace on STDERR while runniogn program");
+                    eprintln!("  --strict    Aborts when popping from empty stack or accessing uninitialised ram");
                     eprintln!("  --compile   Compiles program to bytecode (emitted on STDOUT)");
                     eprintln!("  --bytecode  Runs compiled bytecode instead of text");
                 },                
                 "--debug" => {
                     debug = true;
                 },
+                "--strict" => {
+                    strict = true;
+                },                
                 "--compile" => {
                     mode = Mode::COMPILE;
                 },
@@ -114,14 +120,14 @@ fn main() {
 
     match(mode){
         Mode::RUN => { 
-            run(&tokenise(script_bytes), debug); 
+            run(&tokenise(script_bytes), debug, strict); 
         },
         Mode::COMPILE => { 
             let mut out = stdout().lock();
             out.write( &compile(&tokenise(script_bytes)) ); 
         },
         Mode::BYTECODE => { 
-            run(&bytecode(&script_bytes), debug); 
+            run(&bytecode(&script_bytes), debug, strict); 
         },
     }
 
@@ -185,22 +191,49 @@ fn bytecode(bytecode:&Vec<u8>) -> Vec<u8>{
     code
 }
 
-const STACK_ZERO:&str = "Error: Stack Depleted!";
-
 
 trait Oos{
-    fn oos(self:&Self)->i64;
+    fn oos(self:&Self, infinite_stack:&bool)->i64;
 }
 
 impl Oos for Option<i64>{
-    fn oos(self:&Self) -> i64{
+    fn oos(self:&Self, strict:&bool) -> i64{
         match(self){
+
             Some(v) => *v,
             None => {
-                // 0 //by design reading form enpty stack reads all 0's
-                eprintln!("{}", STACK_ZERO);
-                exit(1);
+                if *strict{
+                    eprintln!("Strict mode violation: Stack depleted");
+                    exit(1);
+                }else{
+                    -1
+                }
             }
+
+        }
+
+    }    
+}
+
+
+trait Oom{
+    fn oom(self:&Self, strict:&bool)->i64;
+}
+
+impl Oom for Option<&i64>{
+    fn oom(self:&Self, strict:&bool) -> i64{
+        match(self){
+
+            Some(v) => **v,
+            None => {
+                if *strict{
+                    eprintln!("Strict mode violation: Acessing uninitialised ram");
+                    exit(1);
+                }else{
+                    0
+                }
+            }
+
         }
 
     }    
@@ -208,7 +241,7 @@ impl Oos for Option<i64>{
 
 
 
-fn run(code:&Vec<u8>, debug:bool){
+fn run(code:&Vec<u8>, debug:bool, strict:bool){
 
     if code.len() == 0{return}
 
@@ -244,34 +277,34 @@ fn run(code:&Vec<u8>, debug:bool){
 
         match(code[index]){
             b'[' => { // PUSH to stack form ram (read from ram) stack: [ptr] -> [value]
-                let ptr = stack.pop().oos();
-                stack.push( *ram.get(&ptr).or(Some(&0)).unwrap() ); //non written emmeory = 0
+                let ptr = stack.pop().oos(&strict);
+                stack.push( ram.get(&ptr).oom(&strict) ); //non written emmeory = 0    
             }
             b']' => { // POP stack to ram (write to ram) stack: [value, ptr] -> []
-                let ptr = stack.pop().oos();
-                let value = stack.pop().oos();
+                let ptr = stack.pop().oos(&strict);
+                let value = stack.pop().oos(&strict);
                 ram.insert(ptr, value);
             }
             b'+' => {
-                let b = stack.pop().oos();
-                let a = stack.pop().oos();
+                let b = stack.pop().oos(&strict);
+                let a = stack.pop().oos(&strict);
                 stack.push( (Wrapping(a)+Wrapping(b)).0 );
             }
             b'-' => {
-                let b = stack.pop().oos();
-                let a = stack.pop().oos();
+                let b = stack.pop().oos(&strict);
+                let a = stack.pop().oos(&strict);
                 stack.push( (Wrapping(a)-Wrapping(b)).0 );
             }
             b'*' => { // MULTIPLY stack:[a,b] -> [low, high]
-                let b = stack.pop().oos();
-                let a = stack.pop().oos();
+                let b = stack.pop().oos(&strict);
+                let a = stack.pop().oos(&strict);
                 let x = i128::from(a)*i128::from(b);
                 stack.push(x as i64);
-                stack.push((x >> 64) as i64);
+                // stack.push((x >> 64) as i64); //just lose the eccess
             }
             b'/' => {
-                let b = stack.pop().oos();
-                let a = stack.pop().oos();
+                let b = stack.pop().oos(&strict);
+                let a = stack.pop().oos(&strict);
                 if b != 0{
                     stack.push(a/b);
                 }else{
@@ -279,42 +312,45 @@ fn run(code:&Vec<u8>, debug:bool){
                 }
             }
             b'|' => {
-                let b = stack.pop().oos();
-                let a = stack.pop().oos();
+                let b = stack.pop().oos(&strict);
+                let a = stack.pop().oos(&strict);
                 stack.push( a | b );
             }
             b'&' => {
-                let b = stack.pop().oos();
-                let a = stack.pop().oos();
+                let b = stack.pop().oos(&strict);
+                let a = stack.pop().oos(&strict);
                 stack.push( a & b );
             }
             b'^' => {
-                let b = stack.pop().oos();
-                let a = stack.pop().oos();
+                let b = stack.pop().oos(&strict);
+                let a = stack.pop().oos(&strict);
                 stack.push( a ^ b );
             }
             b'!' => {
                 stack.push( -1 );
             }
             b'1' => {
-                let a = stack.pop().oos();
+                let a = stack.pop().oos(&strict);
                 stack.push((a << 1) | 0b1);
             }
             b'0' => {
-                let a = stack.pop().oos();
+                let a = stack.pop().oos(&strict);
                 stack.push((a << 1));
             }
             b'$' => {
+                if strict{
+                    eprintln!("Strict mode violation: Using reserved opcode $");    
+                }
                 // Reserved for special functions (opening files and such)
                 // its NOOP now, but dont count on that in the future (might also consume more stack etc)
             }
             b'@' => {
-                let a = stack.pop().oos();
+                let a = stack.pop().oos(&strict);
                 if a == -1 {break} // This would lead to perpetual spinlock basically haling ,execution, so better make it an exit strategy
                 index = (Wrapping(index)+Wrapping(a as usize)).0;
             }
             b'<' => { //READ BYTE stack: [fp] -> [char]
-                let fp = stack.pop().oos();
+                let fp = stack.pop().oos(&strict);
 
                 match fp{
                     0 => {
@@ -326,14 +362,16 @@ fn run(code:&Vec<u8>, debug:bool){
                         stack.push(stack_value);
                     }
                     _ => {
-                        eprintln!("ERROR: Wrong fd for READ, for now only 0 STDIN is implemented!");
-                        exit(1);                        
+                        if strict {
+                            eprintln!("Strict mode violation: Wrong fd for READ, for now only 0 STDIN is implemented!");
+                            exit(1);
+                        }
                     }
                 }
             }
             b'>' => { //WRITE BYTE stack: [ch, fp] -> []
-                let fp = stack.pop().oos();
-                let ch = stack.pop().oos();
+                let fp = stack.pop().oos(&strict);
+                let ch = stack.pop().oos(&strict);
 
                 match fp{
                     1 => {
@@ -357,8 +395,10 @@ fn run(code:&Vec<u8>, debug:bool){
                         )
                     }
                     _ => {
-                        eprintln!("ERROR: Wrong fd for WRITE, for now only 1 STDOUT and 2 STDERR is implemented!");
-                        exit(1);                        
+                        if strict {
+                            eprintln!("Strict mode violation: Wrong fd for WRITE, for now only 1 STDOUT and 2 STDERR is implemented!");
+                            exit(1);
+                        }                
                     }
                 }
             }            

@@ -1,4 +1,4 @@
-#!./target/release/stackofstacks
+#!./target/release/stackofstacks --strict
 
 !!^< 			push zero and then READ
 !!^]			#store in ram[0]
