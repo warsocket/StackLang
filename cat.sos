@@ -1,7 +1,7 @@
 #!./target/release/stackofstacks --strict
 
 ?
-=!^=/0@		#jump 2 if read vlaue != -1
+=!^=/0@		#jump 2 if read value != -1
 !@			#exit
 .
 !01110@		#jump -11

@@ -1,0 +1,17 @@
+#! ../target/release/stackofstacks --strict
+
+# program reads byte per byte 
+# program terminates when byte value >= 55 (ascii 7) or larger
+
+!!^1000000000000000000000000000000000000000000000000000000000000000	#big constant which matches the sign bit
+
+=
+?
+!!^110111		#-55
+-
+&				# just keep the sign bit (so if som answer was smaller than our target)
+=/0@!@			# jump over halt(!@) if sign bit was 1 (x2 and then jump either +0[halt] +2[continue] )
+!1100100@		# jump chack to start of program
+
+
+

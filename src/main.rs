@@ -290,7 +290,7 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
                 let b = stack.pop().oos(&strict);
                 
                 stack.push(a);
-                stack = &mut stacks[!stack_index&1];
+                stack = &mut stacks[stack_index];
                 stack.push(b);
             }
             b'=' => {// Duplicate top value
@@ -433,7 +433,12 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
         if (index<0) | (index >= code.len()) {break}
     }
 
-    if debug{eprintln!("{:?}", &stack);}
+    if debug{
+        // eprintln!("{:?}", &stack);
+        eprintln!("{:?}", &stack);
+        stack = &mut stacks[!stack_index&1];
+        eprintln!("{:?}", &stack);
+    }
     
 
 }

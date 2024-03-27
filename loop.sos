@@ -2,6 +2,8 @@
 
 !!^1111		#init loop counter
 
+!!^101010.	#write *
+
 !+			#-1
 ==/			#check if zero
-!0100*@		#JNZ -12
+!01001*@	#JNZ -23

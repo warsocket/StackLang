@@ -1,0 +1,27 @@
+#! ../target/release/stackofstacks --strict
+# this program branches based on wheter your byte is even or uneven
+# it prints an U for uneven or a E for even
+
+?
+!!^1&
+!!^1101
+*@
+!!^1000101.		#write U
+!@				#HALT
+!!^1010101.		#write E
+!@				#HALT
+
+
+# $ ./branch.sos        
+# a
+# U
+# 
+# $ ./branch.sos
+# b
+# 
+# 
+# $ ./branch.sos
+# c
+# U
+# 
+# Q.E.D.
