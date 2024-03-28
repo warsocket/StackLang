@@ -1,0 +1,114 @@
+#! ../target/release/stackofstacks --strict
+# Implements Rule 110 which has been proven turing complete
+# See: https://en.wikipedia.org/wiki/Rule_110
+
+
+#rule 110: 110 = 0b01101110
+# 111  110  101  100  011  010  001  000
+#  0    1    1    0    1    1    1    0
+
+# pattern is 100 = 0 so pattern cannot grow to the right (grows in 1 direction) we take that as given in this implementation
+
+# abc
+# a^b^c^( a|(b&c) )
+
+
+
+
+!!$!!				#insert backstops  when scanning to trhe right you need 2
+#!!^!!^
+!!^1!!^1!!^1		#input initial state 1 here  100
+!!^					#no double padding here since patterns do not gor to the right / this way
+#!!^1==	#input initial state 1 here
+
+
+# Main loop [head at end of tape]
+
+	#Add 0 to end of tape
+	#!!^
+	# Rewind tape offset 0x15
+	$!$~&xxx	# tape LEFT
+	=!-=/		# end of tape = 0 else 1
+	!11101011*@	# jump back this much if at the end of the tape
+
+	$!!^!!^$	#append [0,0] cells and move tape left 2	#parrent 001 can grow so we need to be able to prcess it 
+	
+	#Process 1 triple (consuming 1 bit on tape)
+
+	# ENTRYPOINT FOR CONTINUED PROCESSING:
+	!@
+	# copy triple [we consume this one] 
+	!$~&$=xx	# tape RIGHT + clone
+	~!$~&$xx	# tape RIGHT, (bring state)
+	~!$~&$xx	# tape RIGHT, (bring state)
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+
+	!$~&$=xx	# tape RIGHT + clone
+	~!$~&$xx	# tape RIGHT, (bring state)
+	~!$~&$xx	# tape RIGHT, (bring state)
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+
+	!$~&$=xx	# tape RIGHT + clone
+	~!$~&$xx	# tape RIGHT, (bring state)
+	~!$~&$xx	# tape RIGHT, (bring state)
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+
+	#and agian
+
+	!$~&$=xx	# tape RIGHT + clone
+	~!$~&$xx	# tape RIGHT, (bring state)
+	~!$~&$xx	# tape RIGHT, (bring state)
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+
+	!$~&$=xx	# tape RIGHT + clone
+	~!$~&$xx	# tape RIGHT, (bring state)
+	~!$~&$xx	# tape RIGHT, (bring state)
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+
+	!$~&$=xx	# tape RIGHT + clone
+	~!$~&$xx	# tape RIGHT, (bring state)
+	~!$~&$xx	# tape RIGHT, (bring state)
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+	$!$~&xxx	# tape LEFT
+
+	# a^b^c^( a|(b&c) )
+	# stack = [a,b,c,a,b,c]
+	&|			# stack = [a,b,c,a|(b&c)]
+	^^^			# stack = [a^b^c^a|(b&c)] === new number form 3 bits
+
+	
+	!$~&$xxx	# tape RIGHT
+	!|&			# remove stack top
+	# now we have our first answer on stack and the rest to do on alt stack this us status quo to repeat
+	
+	##check if we still have at least 3 numbers left
+	!$~&$xxx	# tape RIGHT
+	!$~&$xxx	# tape RIGHT
+	!$~&$xxx	# tape RIGHT
+	#if it was only 2 then this number will be -1
+	=
+	$!$~&xxx	# tape LEFT
+	!-=/xxxx	# 0 if -1 else 1
+	0000@xxx	# jmp 0/1 * 16
+	!!^000000010000@	#End of tape [tape will rewind using aformentioned code]
+	!11111111111111@	#New numbers [reset tape from end check then continue]	OFFSET: 0x141
+	
+	# end of tape code
+	!@
+	!||&	#kill last 2 cells
+	!!^		#append [0] cells
+	!@
+
+
+
