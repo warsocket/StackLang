@@ -1,18 +1,22 @@
 %YAML 1.2
 ---
 file_extensions: [sos]
-
-scope: comment
+scope: source
 contexts:
   main:
     - match: '#'
       push: line_comment
 
+    - match: '\['
+      scope: support
+      push: macro
+
+    - match: ':'
+      scope: support
+      push: label
+
     - match: '[\^\|&*/+\-]'
       scope: variable.function
-
-    # - match: '[$]'
-      # scope: invalid.reserved
 
     - match: '[\!@~=$]'
       scope: keyword
@@ -21,9 +25,52 @@ contexts:
       scope: storage
 
     - match: '[01]+'
-      scope: constant
+      scope: constant.numeric
+
+    - match: '.'
+      scope: comment
 
   line_comment:
     - meta_scope: comment.line
     - match: $
+      pop: true
+
+  macro:
+    - match: '\]'
+      scope: support
+      pop: true
+
+    - match: '[^\]]+'
+      scope: source
+
+    # - match: '[+-/*,][+-/*,]+'
+    #   scope: invalid.illegal
+
+    # - match: '[+-/*,]'
+    #   scope: variable.function
+
+    # - match: '([0-9]+[a-z]+)|([a-z]+[0-9]+)'
+    #   scope: invalid.illegal
+
+    # - match: '[^+\-\/*,\]]+@([^+\-\/*,\]]+)?'
+    #   scope: invalid.illegal
+
+    # - match: '([^+\-\/*,\]]+)?@[^+\-\/*,\]]+'
+    #   scope: invalid.illegal
+
+    # - match: '[0-9]+'
+    #   scope: constant.numeric
+
+    # - match: '[a-z]+'
+    #   scope: entity.name.label
+
+    # - match: '@'
+    #   scope: entity.name.label
+
+    # - match: '[^\]]+'
+    #   scope: invalid.illegal
+
+  label:
+    - match: '[a-z]+'
+      scope: entity.name.label
       pop: true

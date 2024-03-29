@@ -44,6 +44,7 @@ fn main() {
         RUN,
         COMPILE,
         BYTECODE,
+        DUMP,
     }
 
 
@@ -55,6 +56,7 @@ fn main() {
                 "--help" => {
                     eprintln!("Usage stackofstacks [--debug, --compile, --bytecode] FILENAME");
                     eprintln!("  --debug     Shows debug / trace on STDERR while runniogn program");
+                    eprintln!("  --dump      Dumps the raw (macro expanded) code");
                     eprintln!("  --strict    Aborts when popping from empty stack or accessing uninitialised ram");
                     eprintln!("  --compile   Compiles program to bytecode (emitted on STDOUT)");
                     eprintln!("  --bytecode  Runs compiled bytecode instead of text");
@@ -62,9 +64,12 @@ fn main() {
                 "--debug" => {
                     debug = true;
                 },
+                "--dump" => {
+                    mode = Mode::DUMP;
+                },                
                 "--strict" => {
                     strict = true;
-                },                
+                },
                 "--compile" => {
                     mode = Mode::COMPILE;
                 },
@@ -125,9 +130,25 @@ fn main() {
         Mode::BYTECODE => { 
             run(&bytecode(&script_bytes), debug, strict); 
         },
+        Mode::DUMP => { 
+            let pure_script = tokenise(script_bytes);
+            let string = std::str::from_utf8(&pure_script).expect("INTERPRETER's FAULT: The function 'tokenise' should have checked for non ascii characters!"); //the 
+            let mut index = 0;
+
+            for token in string.chars(){
+                eprintln!("0x{:#018X}:  {}", index, token);
+                index += 1;
+            }
+
+        },        
     }
 
 }
+
+fn expand(input:&Vec<u8>)->Vec<u8>{
+    vec!()
+}
+
 
 fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
 
@@ -137,15 +158,34 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
         Source,
         Comment,
         Macro,
+        Label,
     }
 
-
+    
     let mut pure_script:Vec<u8> = vec!();
     let mut ignore_to_newline = false;
 
     let mut state = State::Source;
+    let mut line_count = 1;
+    let mut char_count = 1;
+
+    let mut buffer:Vec<u8> = vec!();
+    let mut labels:HashMap<Vec<u8>, usize> = HashMap::new();
+
     for token in script_bytes{
 
+
+        if token >= 0x80 {
+            eprintln!("Parsing error: Illegal (Non ASCII) character found at {}:{}", line_count, char_count);
+            exit(1);
+        }
+        if token != 0x0D{ //CR not counted
+            char_count += 1;
+        }
+        if token == 0x0A{
+            char_count = 1;
+            line_count += 1;
+        }
 
         match state{
             State::Source =>{
@@ -156,7 +196,12 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
                         b'#' => {
                             state = State::Comment;
                         },
-                        // b'(' => {},
+                        b'[' => {
+                            state = State::Macro;
+                        },
+                        b':' => {
+                            state = State::Label;
+                        },                        
                         _ => (), //preceived as comment
                     }
                 }
@@ -170,12 +215,38 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
                 }                
             },
             State::Macro =>{
+                match token{
+                    b']' => {
+                        pure_script.extend(expand(&buffer));
 
+                        state = State::Source;
+                        buffer = vec!();
+                    },
+                    b => {
+                        eprintln!("Parsing error: Illegal macro token: {}", match std::str::from_utf8(&[b]){
+                            Ok(c) => "'".to_owned() + c + "'",
+                            Err(_) => format!("{:x}", b),
+                        });
+                        exit(1);
+                    }
+                }                
+            }
+            State::Label =>{ //97=122
+                if (97 <= token) && (token <= 122){
+                    buffer.push(token);
+                }else{
+                    labels.insert(buffer, pure_script.len());
+
+                    state = State::Source;
+                    buffer = vec!();
+                }   
             }
         }
 
 
     }
+
+    // println!("{}", std::str::from_utf8(&pure_script).unwrap());
     pure_script
 
 }
@@ -386,7 +457,7 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
         index = (Wrapping(index)+Wrapping(1usize)).0;
         if (index<0) | (index >= code.len()) {
             if strict{
-                eprintln!("Strict mode violation: Outside of code memmory");
+                eprintln!("Strict mode violation: Outside of code memmory (offset: 0x{:#018X})", index);
                 exit(1);
             }else{
 
@@ -395,7 +466,6 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
     }
 
     if debug{
-        // eprintln!("{:?}", &stack);
         eprintln!("{:?}", &stack);
         stack = &mut stacks[!stack_index&1];
         eprintln!("{:?}", &stack);
