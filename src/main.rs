@@ -131,22 +131,51 @@ fn main() {
 
 fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
 
+
+    #[derive(Copy, Clone)]
+    enum State{
+        Source,
+        Comment,
+        Macro,
+    }
+
+
     let mut pure_script:Vec<u8> = vec!();
     let mut ignore_to_newline = false;
 
+    let mut state = State::Source;
     for token in script_bytes{
 
-        if ignore_to_newline{
-            if token == b'\n'{ ignore_to_newline = false; }
-        }else{
-            if TOKENS.contains(&token){
-                pure_script.push(token)
-            }else if token == b'#'{
-                ignore_to_newline = true;
+
+        match state{
+            State::Source =>{
+                if TOKENS.contains(&token){
+                    pure_script.push(token);
+                }else{
+                    match token{
+                        b'#' => {
+                            state = State::Comment;
+                        },
+                        // b'(' => {},
+                        _ => (), //preceived as comment
+                    }
+                }
+            },
+            State::Comment =>{
+                match token{
+                    b'\n' => {
+                        state = State::Source;
+                    },
+                    _ => (), //preceived as comment
+                }                
+            },
+            State::Macro =>{
+
             }
         }
-    }
 
+
+    }
     pure_script
 
 }
