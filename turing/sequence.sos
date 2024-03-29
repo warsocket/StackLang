@@ -2,6 +2,7 @@
 
 !!^1000001.	#Sequance A which writes "A"
 !!^1000010.	#Sequance B which writes "B"
+!@
 
 # $ ./sequence.sos 
 # AB

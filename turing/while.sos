@@ -12,6 +12,6 @@
 &				# just keep the sign bit (so if som answer was smaller than our target)
 =/0@!@			# jump over halt(!@) if sign bit was 1 (x2 and then jump either +0[halt] +2[continue] )
 !1100100@		# jump chack to start of program
-
+!@
 
 

@@ -26,7 +26,7 @@ const TOKENS:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
     b'.', // WRITE write byte to fs
     b'0', // SHL 1
     b'1', // SHL 1; | 1
-]; //Jumping outsid eof the array of instruction = HALT
+];
 
 fn main() {
 
@@ -46,8 +46,6 @@ fn main() {
         BYTECODE,
     }
 
-
-    // println!("{}", fil)
 
     for p in params{
         let param = p.as_str();
@@ -163,7 +161,7 @@ fn compile(code:&Vec<u8>) -> Vec<u8>{
         opcodes.insert(*token, index as u8);
     }
 
-    //Since opcode 0 (PUSH(reg)) always works and is benign on itself, we dont care is lasat nibble contains just that.
+    //Since opcode 0 (PUSH(-1)) always works and is benign on itself, we dont care is lasat nibble contains just that.
     for token in code{
         if high_bits{
             out.push( *opcodes.get(token).unwrap() << 4 );
@@ -245,24 +243,6 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
 
     let mut index = 0;
     let mut ram:HashMap<i64, i64> = HashMap::new();
-
-    // let func_matrix:[&dyn Fn(i64) -> i64;3] = [
-    //     &|a| {
-    //     let mut buffer:[u8;1] = [0];
-    //     stdin().lock().read_exact(&mut buffer);
-    //     buffer[0] as i64
-    //     }, //STDIN READ BYTE
-    //     &|a| {
-    //         let buffer:[u8;1] = [a as u8];
-    //         stdout().lock().write(&buffer).expect("Write Error") as i64;
-    //         1i64 //
-    //     }, //STDOUT WRITE BYTE
-    //     &|a| {
-    //         let buffer:[u8;1] = [a as u8];
-    //         stderr().lock().write(&buffer).expect("Write Error") as i64;
-    //         2i64            
-    //     }, //STDERR WRITE BYTE
-    // ];
 
     let mut stacks: [Vec<i64>;2] = [vec!(),vec!()];
     let mut stack: &mut Vec<i64>;
@@ -355,74 +335,19 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
                 if a == -1 {break} // This would lead to perpetual spinlock basically haling ,execution, so better make it an exit strategy
                 index = (Wrapping(index)+Wrapping(a as usize)).0;
             }
-            b'?' => { //READ BYTE stack: [fp] -> [char]
-                // let fp = stack.pop().oos(&strict);
-
+            b'?' => {
                 let mut buffer:[u8;1] = [0];
                 let stack_value = match stdin().lock().read_exact(&mut buffer){
                     Ok(_) => buffer[0] as i64,
                     Err(_) => -1,   
                 };
                 stack.push(stack_value);
-
-                // match fp{
-                //     0 => {
-                //         let mut buffer:[u8;1] = [0];
-                //         let stack_value = match stdin().lock().read_exact(&mut buffer){
-                //             Ok(_) => buffer[0] as i64,
-                //             Err(_) => -1,   
-                //         };
-                //         stack.push(stack_value);
-                //     }
-                //     _ => {
-                //         if strict {
-                //             eprintln!("Strict mode violation: Wrong fd for READ, for now only 0 STDIN is implemented!");
-                //             exit(1);
-                //         }
-                //     }
-                // }
             }
-            b'.' => { //WRITE BYTE stack: [ch, fp] -> []
-                // let fp = stack.pop().oos(&strict);
+            b'.' => {
                 let ch = stack.pop().oos(&strict);
 
                 let buffer:[u8;1] = [ch as u8];
                 let _ = stdout().lock().write(&buffer);
-                // stack.push(
-                //     match ret{
-                //         Ok(_) => 0i64,
-                //         Err(_) => -1i64,
-                //     }
-                // )
-
-                // match fp{
-                //     1 => {
-                //         let buffer:[u8;1] = [ch as u8];
-                //         let ret = stdout().lock().write(&buffer);
-                //         stack.push(
-                //             match ret{
-                //                 Ok(_) => 0i64,
-                //                 Err(_) => -1i64,
-                //             }
-                //         )
-                //     }
-                //     2 =>{
-                //         let buffer:[u8;1] = [ch as u8];
-                //         let ret = stderr().lock().write(&buffer);
-                //         stack.push(
-                //             match ret{
-                //                 Ok(_) => 0i64,
-                //                 Err(_) => -1i64,
-                //             }
-                //         )
-                //     }
-                //     _ => {
-                //         if strict {
-                //             eprintln!("Strict mode violation: Wrong fd for WRITE, for now only 1 STDOUT and 2 STDERR is implemented!");
-                //             exit(1);
-                //         }                
-                //     }
-                // }
             }            
             _ => {
                 panic!("INTERPRETER's FAULT: Invalid token!")
@@ -430,7 +355,14 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
         }
 
         index = (Wrapping(index)+Wrapping(1usize)).0;
-        if (index<0) | (index >= code.len()) {break}
+        if (index<0) | (index >= code.len()) {
+            if strict{
+                eprintln!("Strict mode violation: Outside of code memmory");
+                exit(1);
+            }else{
+
+            }   index = 0;
+        }
     }
 
     if debug{
