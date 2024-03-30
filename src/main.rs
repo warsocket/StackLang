@@ -6,6 +6,9 @@ use std::arch::asm;
 use std::io::{Read, Write, stdin, stdout, stderr};
 use std::collections::HashMap;
 
+use regex::Regex;
+
+
 const TOKENS:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
     b'!', // HIGH ALL write new value to stack with all bits set to 1 (-1)
     b'^', // XOR
@@ -132,7 +135,9 @@ fn main() {
         },
         Mode::DUMP => { 
             let pure_script = tokenise(script_bytes);
-            let string = std::str::from_utf8(&pure_script).expect("INTERPRETER's FAULT: The function 'tokenise' should have checked for non ascii characters!"); //the 
+
+             //input is already screened to not contain non-ascii characters by the tokenise funtion
+            let string = std::str::from_utf8(&pure_script).expect("INTERPRETER's FAULT: The function 'tokenise' should have checked for non ascii characters!");
             let mut index = 0;
 
             for token in string.chars(){
@@ -144,9 +149,75 @@ fn main() {
     }
 
 }
+// ^(\-?[0-9]+|@)([+|\-](@([0-9]+)))*$
+fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>{
 
-fn expand(input:&Vec<u8>)->Vec<u8>{
-    vec!()
+    // if input.len() == 0{
+    //     return vec!();
+    // }
+
+    //input is already screened to not contain non-ascii characters by the tokenise funtion
+    let string = std::str::from_utf8(input).expect("INTERPRETER's FAULT: The function 'tokenise' should have checked for non ascii characters!");
+    let re = Regex::new("^(?<num>\\-?[0-9]+|[a-z]+|@)((?<op>[+|\\-])(@|([a-z]+)|([0-9]+)))*$").unwrap();
+    
+    if re.is_match(string){ // Valid Macro
+
+        
+        let resolve_num = |num_or_symbol:&str|->i64{
+            //can only be a number since we checked using regex
+
+            let result_num:Result<i64,_> = num_or_symbol.parse(); //can only be a number since we checked using regex, so if not number its a variable to the labels map
+            let num:i64;
+
+            if let Ok(x) = result_num{ //got the number
+                num = x;
+            }else if num_or_symbol == "@"{
+                num = *index as i64+64+1;       //<===== SET SIZE OF EXPANSION ITSELF HERE
+            }else{ // more processing needed (its a label)
+                if let Some(n) = labels.get(num_or_symbol.as_bytes()){
+                    num = *n as i64;
+                }else{
+                    // Referenced label is not found
+                    eprintln!("Macro parsing error: reference to undefined label: ':{}'", num_or_symbol);
+                    exit(1);
+                }
+            }
+
+            num
+        };
+
+
+        let init_capture = re.captures(string).unwrap(); //get init number
+        let repeat = Regex::new("((?<op>[+|\\-])(?<num>@|([0-9]+)))").unwrap();
+        let mut it = repeat.captures_iter(string);
+
+        let mut acc:i64 = resolve_num(&init_capture["num"]);
+
+        // The repeat part also matches on the leading numbe rif its negative, so we correct for it.
+        if acc < 0 { //equivalent to:  if &init_capture["num"][0..1] == "-"
+            it.next();
+        }
+        
+        for data in it{
+            let number_str:&str = &data["num"];
+            let num = resolve_num(number_str);
+
+            match &data["op"]{
+                "+" => {acc += num}
+                "-" => {acc -= num}
+                _ => {panic!("INTERPRETER's FAULT: The operator string should only be + or - du to the receeding Regex!")}
+            }
+        }
+
+        // println!("{:064b}", -1i64);
+        return Vec::from(format!("!{:064b}", acc));
+
+
+    }else{ //Ivalid Macro
+        eprintln!("Illegal Macro: [{}]", string);
+        exit(-1);
+    }
+
 }
 
 
@@ -217,17 +288,21 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
             State::Macro =>{
                 match token{
                     b']' => {
-                        pure_script.extend(expand(&buffer));
+                        let expanded_macro = expand(&buffer, &labels, &pure_script.len());
+
+                        for token in &expanded_macro{
+                            if !TOKENS.contains(&token){
+                                panic!("INTERPRETER's FAULT: Invalid tokens in macro output!");
+                            }
+                        }
+                        
+                        pure_script.extend(expanded_macro);
 
                         state = State::Source;
                         buffer = vec!();
                     },
                     b => {
-                        eprintln!("Parsing error: Illegal macro token: {}", match std::str::from_utf8(&[b]){
-                            Ok(c) => "'".to_owned() + c + "'",
-                            Err(_) => format!("{:x}", b),
-                        });
-                        exit(1);
+                        buffer.push(b);
                     }
                 }                
             }
@@ -310,32 +385,6 @@ impl Oos for Option<i64>{
 
     }    
 }
-
-
-trait Oom{
-    fn oom(self:&Self, strict:&bool)->i64;
-}
-
-impl Oom for Option<&i64>{
-    fn oom(self:&Self, strict:&bool) -> i64{
-        match(self){
-
-            Some(v) => **v,
-            None => {
-                if *strict{
-                    eprintln!("Strict mode violation: Acessing uninitialised ram");
-                    exit(1);
-                }else{
-                    0
-                }
-            }
-
-        }
-
-    }    
-}
-
-
 
 fn run(code:&Vec<u8>, debug:bool, strict:bool){
 

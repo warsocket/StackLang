@@ -40,35 +40,35 @@ contexts:
       scope: support
       pop: true
 
-    - match: '[^\]]+'
-      scope: source
-
-    # - match: '[+-/*,][+-/*,]+'
-    #   scope: invalid.illegal
-
-    # - match: '[+-/*,]'
-    #   scope: variable.function
-
-    # - match: '([0-9]+[a-z]+)|([a-z]+[0-9]+)'
-    #   scope: invalid.illegal
-
-    # - match: '[^+\-\/*,\]]+@([^+\-\/*,\]]+)?'
-    #   scope: invalid.illegal
-
-    # - match: '([^+\-\/*,\]]+)?@[^+\-\/*,\]]+'
-    #   scope: invalid.illegal
-
-    # - match: '[0-9]+'
-    #   scope: constant.numeric
-
-    # - match: '[a-z]+'
-    #   scope: entity.name.label
-
-    # - match: '@'
-    #   scope: entity.name.label
-
     # - match: '[^\]]+'
-    #   scope: invalid.illegal
+    #   scope: source
+
+    - match: '[+-/*,][+-/*,]+'
+      scope: invalid.illegal
+
+    - match: '[+-/*]'
+      scope: variable.function
+
+    - match: '([0-9]+[a-z]+)|([a-z]+[0-9]+)'
+      scope: invalid.illegal
+
+    - match: '[^+\-\/*\]]+@([^+\-\/*\]]+)?'
+      scope: invalid.illegal
+
+    - match: '([^+\-\/*\]]+)?@[^+\-\/*\]]+'
+      scope: invalid.illegal
+
+    - match: '[0-9]+'
+      scope: constant.numeric
+
+    - match: '[a-z]+'
+      scope: entity.name.label
+
+    - match: '@'
+      scope: entity.name.label
+
+    - match: '[^\]]+'
+      scope: invalid.illegal
 
   label:
     - match: '[a-z]+'
