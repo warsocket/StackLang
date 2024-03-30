@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::env;
+use std::assert;
 use std::process::exit;
 use std::num::Wrapping;
 use std::arch::asm;
@@ -124,17 +125,19 @@ fn main() {
 
     match(mode){
         Mode::RUN => { 
-            run(&tokenise(script_bytes), debug, strict); 
+            // println!("{:?}", &tokenise(script_bytes));
+            // println!("{}", std::str::from_utf8(&parse(&tokenise(script_bytes))).unwrap());
+            run(&parse(&tokenise(script_bytes)), debug, strict);
         },
         Mode::COMPILE => { 
             let mut out = stdout().lock();
-            out.write( &compile(&tokenise(script_bytes)) ); 
+            out.write( &compile(&parse(&tokenise(script_bytes))) ); 
         },
         Mode::BYTECODE => { 
-            run(&bytecode(&script_bytes), debug, strict); 
+            run(&bytecode(&parse(&tokenise(script_bytes))), debug, strict); 
         },
         Mode::DUMP => { 
-            let pure_script = tokenise(script_bytes);
+            let pure_script = parse(&tokenise(script_bytes));
 
              //input is already screened to not contain non-ascii characters by the tokenise funtion
             let string = std::str::from_utf8(&pure_script).expect("INTERPRETER's FAULT: The function 'tokenise' should have checked for non ascii characters!");
@@ -149,16 +152,13 @@ fn main() {
     }
 
 }
-// ^(\-?[0-9]+|@)([+|\-](@([0-9]+)))*$
+
 fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>{
 
-    // if input.len() == 0{
-    //     return vec!();
-    // }
 
     //input is already screened to not contain non-ascii characters by the tokenise funtion
     let string = std::str::from_utf8(input).expect("INTERPRETER's FAULT: The function 'tokenise' should have checked for non ascii characters!");
-    let re = Regex::new("^(?<num>\\-?[0-9]+|[a-z]+|@)((?<op>[+|\\-])(@|([a-z]+)|([0-9]+)))*$").unwrap();
+    let re = Regex::new("^(?<num>\\-?[0-9]+|[a-z]+)((?<op>[+|\\-])(([a-z]+)|([0-9]+)))*$").unwrap();
     
     if re.is_match(string){ // Valid Macro
 
@@ -171,8 +171,6 @@ fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>
 
             if let Ok(x) = result_num{ //got the number
                 num = x;
-            }else if num_or_symbol == "@"{
-                num = *index as i64+64+1;       //<===== SET SIZE OF EXPANSION ITSELF HERE
             }else{ // more processing needed (its a label)
                 if let Some(n) = labels.get(num_or_symbol.as_bytes()){
                     num = *n as i64;
@@ -188,7 +186,7 @@ fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>
 
 
         let init_capture = re.captures(string).unwrap(); //get init number
-        let repeat = Regex::new("((?<op>[+|\\-])(?<num>@|([0-9]+)))").unwrap();
+        let repeat = Regex::new("((?<op>[+|\\-])(?<num>([a-z]+)|[0-9]+))").unwrap();
         let mut it = repeat.captures_iter(string);
 
         let mut acc:i64 = resolve_num(&init_capture["num"]);
@@ -199,6 +197,7 @@ fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>
         }
         
         for data in it{
+
             let number_str:&str = &data["num"];
             let num = resolve_num(number_str);
 
@@ -209,8 +208,17 @@ fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>
             }
         }
 
-        // println!("{:064b}", -1i64);
-        return Vec::from(format!("!{:064b}", acc));
+        let ret = format!("!{:064b}", acc);
+        assert!(ret.len() == 65); //Must be 65 characters wide
+
+        // println!("{}", ret);
+
+        for token in ret.bytes(){
+            if !TOKENS.contains(&token){
+                panic!("INTERPRETER's FAULT: Invalid tokens in macro output!");
+            }
+        }
+        return Vec::from(ret);
 
 
     }else{ //Ivalid Macro
@@ -220,31 +228,34 @@ fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>
 
 }
 
+#[derive(Debug)]
+enum Token{
+    Script(Vec<u8>),
+    Macro(Vec<u8>),
+    Label(Vec<u8>),
+}
 
-fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
 
+fn tokenise(script_bytes:Vec<u8>) -> Vec<Token>{
 
     #[derive(Copy, Clone)]
     enum State{
-        Source,
+        Script,
         Comment,
         Macro,
         Label,
     }
 
-    
-    let mut pure_script:Vec<u8> = vec!();
-    let mut ignore_to_newline = false;
+    // let mut pure_script:Vec<u8> = vec!();
 
-    let mut state = State::Source;
+    let mut tokenised_script:Vec<Token>  = vec!();
+    let mut buffer:Vec<u8> = vec!();
+
+    let mut state = State::Script;
     let mut line_count = 1;
     let mut char_count = 1;
 
-    let mut buffer:Vec<u8> = vec!();
-    let mut labels:HashMap<Vec<u8>, usize> = HashMap::new();
-
     for token in script_bytes{
-
 
         if token >= 0x80 {
             eprintln!("Parsing error: Illegal (Non ASCII) character found at {}:{}", line_count, char_count);
@@ -258,19 +269,28 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
             line_count += 1;
         }
 
+        
         match state{
-            State::Source =>{
+            State::Script =>{
+                // println!("{:}: {:?}", "Source", std::str::from_utf8(&buffer).unwrap());
+
                 if TOKENS.contains(&token){
-                    pure_script.push(token);
+                    buffer.push(token);
                 }else{
                     match token{
                         b'#' => {
                             state = State::Comment;
                         },
                         b'[' => {
+                            tokenised_script.push(Token::Script(buffer));
+                            buffer = vec!();
+
                             state = State::Macro;
                         },
                         b':' => {
+                            tokenised_script.push(Token::Script(buffer));
+                            buffer = vec!();
+
                             state = State::Label;
                         },                        
                         _ => (), //preceived as comment
@@ -278,28 +298,32 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
                 }
             },
             State::Comment =>{
+                // println!("{:}: {:?}", "Comment", std::str::from_utf8(&buffer).unwrap());
+
                 match token{
                     b'\n' => {
-                        state = State::Source;
+                        state = State::Script;
                     },
                     _ => (), //preceived as comment
                 }                
             },
             State::Macro =>{
+                // println!("{:}: {:?}", "Macro", std::str::from_utf8(&buffer).unwrap());
                 match token{
                     b']' => {
-                        let expanded_macro = expand(&buffer, &labels, &pure_script.len());
+                        // let expanded_macro = expand(&buffer, &labels, &pure_script.len());
 
-                        for token in &expanded_macro{
-                            if !TOKENS.contains(&token){
-                                panic!("INTERPRETER's FAULT: Invalid tokens in macro output!");
-                            }
-                        }
+                        // for token in &expanded_macro{
+                        //     if !TOKENS.contains(&token){
+                        //         panic!("INTERPRETER's FAULT: Invalid tokens in macro output!");
+                        //     }
+                        // }
                         
-                        pure_script.extend(expanded_macro);
-
-                        state = State::Source;
+                        //pure_script.extend(expanded_macro);
+                        tokenised_script.push(Token::Macro(buffer));
                         buffer = vec!();
+
+                        state = State::Script;
                     },
                     b => {
                         buffer.push(b);
@@ -307,13 +331,15 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
                 }                
             }
             State::Label =>{ //97=122
+                // println!("{:}: {:?}", "Label", std::str::from_utf8(&buffer).unwrap());
                 if (97 <= token) && (token <= 122){
                     buffer.push(token);
                 }else{
-                    labels.insert(buffer, pure_script.len());
-
-                    state = State::Source;
+                    // labels.insert(buffer, pure_script.len());
+                    tokenised_script.push(Token::Label(buffer));
                     buffer = vec!();
+
+                    state = State::Script;
                 }   
             }
         }
@@ -321,9 +347,77 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<u8>{
 
     }
 
-    // println!("{}", std::str::from_utf8(&pure_script).unwrap());
-    pure_script
+    match state{
+        State::Script =>{
+            tokenised_script.push(Token::Script(buffer));
+        },
+        State::Comment =>{
+            //not needed here, its just discarded while interwoven with Source state
+        },
+        State::Macro =>{
+            eprintln!("Macro violation: Macro is not closed by EOF.");
+            exit(1);
+        },
+        State::Label =>{
+            tokenised_script.push(Token::Label(buffer));
+        },
+    }
 
+    tokenised_script
+}
+
+//parse to pure_script
+fn parse(tokens:&Vec<Token>) -> Vec<u8>{
+
+    let mut labels:HashMap<Vec<u8>, usize> = HashMap::new();
+
+    // let expanded_macro = expand(&buffer, &labels, &pure_script.len());
+
+    // for token in &expanded_macro{
+    //     if !TOKENS.contains(&token){
+    //         panic!("INTERPRETER's FAULT: Invalid tokens in macro output!");
+    //     }
+    // }
+    
+    //pure_script.extend(expanded_macro);
+
+    let mut index = 0;
+
+    let mut pure_script:Vec<u8> = vec!();
+
+    for token in tokens{
+        match token{
+            Token::Script(v) => {
+                index += v.len();
+            },
+            Token::Macro(v) => {
+                //And heres the crux, we need to know NOW how long expanded macro size will be, and macro needs the label offset chicken and egg story
+                //For now macro's have output size fixed at 65 !+binary number
+                index += 65;
+            },
+            Token::Label(v) => {
+                labels.insert(v.to_vec(), index);
+            },
+        }
+    }
+
+    for token in tokens{
+        match token{
+            Token::Script(v) => {
+                // index += len(v);
+                pure_script.extend(v);
+            },
+            Token::Macro(v) => {
+                let expanded_v = expand(&v, &labels, &index);
+                index += expanded_v.len();
+                pure_script.extend(expanded_v);
+            },
+            Token::Label(v) => {},
+        }
+    }
+
+    // println!("{}", std::str::from_utf8(&pure_script).unwrap());
+    return pure_script;
 }
 
 fn compile(code:&Vec<u8>) -> Vec<u8>{

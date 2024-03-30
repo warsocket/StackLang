@@ -1,6 +1,11 @@
 #!./target/release/stackofstacks --strict
 [3]	#counter, lets print world times
 
+#Now were busy lets skip world to world
+
+[world-postjump]@:postjump
+
+
 [72].
 [101].
 [108].
@@ -18,7 +23,7 @@
 
 [1]-
 ==/
-[world-@-2]	# offset(world) - offset(end of macro) - len(*@)
-*@
+[world-postbackjump] # offset(world) - offset(after) - len(*@
+*@:postbackjump
 
 !@

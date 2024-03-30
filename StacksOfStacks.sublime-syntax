@@ -52,11 +52,11 @@ contexts:
     - match: '([0-9]+[a-z]+)|([a-z]+[0-9]+)'
       scope: invalid.illegal
 
-    - match: '[^+\-\/*\]]+@([^+\-\/*\]]+)?'
-      scope: invalid.illegal
+    # - match: '[^+\-\/*\]]+@([^+\-\/*\]]+)?'
+    #   scope: invalid.illegal
 
-    - match: '([^+\-\/*\]]+)?@[^+\-\/*\]]+'
-      scope: invalid.illegal
+    # - match: '([^+\-\/*\]]+)?@[^+\-\/*\]]+'
+    #   scope: invalid.illegal
 
     - match: '[0-9]+'
       scope: constant.numeric
@@ -64,8 +64,8 @@ contexts:
     - match: '[a-z]+'
       scope: entity.name.label
 
-    - match: '@'
-      scope: entity.name.label
+    # - match: '@'
+    #   scope: entity.name.label
 
     - match: '[^\]]+'
       scope: invalid.illegal
