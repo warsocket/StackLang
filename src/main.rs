@@ -7,8 +7,6 @@ use std::arch::asm;
 use std::io::{Read, Write, stdin, stdout, stderr};
 use std::collections::HashMap;
 
-use regex::Regex;
-
 
 const TOKENS:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
     b'!', // HIGH ALL write new value to stack with all bits set to 1 (-1)
@@ -155,76 +153,163 @@ fn main() {
 
 fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>{
 
-
     //input is already screened to not contain non-ascii characters by the tokenise funtion
     let string = std::str::from_utf8(input).expect("INTERPRETER's FAULT: The function 'tokenise' should have checked for non ascii characters!");
-    let re = Regex::new("^(?<num>\\-?[0-9]+|[a-z]+)((?<op>[+|\\-])(([a-z]+)|([0-9]+)))*$").unwrap();
-    
-    if re.is_match(string){ // Valid Macro
 
-        
-        let resolve_num = |num_or_symbol:&str|->i64{
-            //can only be a number since we checked using regex
-
-            let result_num:Result<i64,_> = num_or_symbol.parse(); //can only be a number since we checked using regex, so if not number its a variable to the labels map
-            let num:i64;
-
-            if let Ok(x) = result_num{ //got the number
-                num = x;
-            }else{ // more processing needed (its a label)
-                if let Some(n) = labels.get(num_or_symbol.as_bytes()){
-                    num = *n as i64;
-                }else{
-                    // Referenced label is not found
-                    eprintln!("Macro parsing error: reference to undefined label: ':{}'", num_or_symbol);
-                    exit(1);
-                }
-            }
-
-            num
-        };
-
-
-        let init_capture = re.captures(string).unwrap(); //get init number
-        let repeat = Regex::new("((?<op>[+|\\-])(?<num>([a-z]+)|[0-9]+))").unwrap();
-        let mut it = repeat.captures_iter(string);
-
-        let mut acc:i64 = resolve_num(&init_capture["num"]);
-
-        // The repeat part also matches on the leading numbe rif its negative, so we correct for it.
-        if acc < 0 { //equivalent to:  if &init_capture["num"][0..1] == "-"
-            it.next();
-        }
-        
-        for data in it{
-
-            let number_str:&str = &data["num"];
-            let num = resolve_num(number_str);
-
-            match &data["op"]{
-                "+" => {acc += num}
-                "-" => {acc -= num}
-                _ => {panic!("INTERPRETER's FAULT: The operator string should only be + or - du to the receeding Regex!")}
-            }
-        }
-
-        let ret = format!("!{:064b}", acc);
-        assert!(ret.len() == 65); //Must be 65 characters wide
-
-        // println!("{}", ret);
-
-        for token in ret.bytes(){
-            if !TOKENS.contains(&token){
-                panic!("INTERPRETER's FAULT: Invalid tokens in macro output!");
-            }
-        }
-        return Vec::from(ret);
-
-
-    }else{ //Ivalid Macro
-        eprintln!("Illegal Macro: [{}]", string);
-        exit(-1);
+    #[derive(Debug)]
+    enum Token{
+        Number(Vec<u8>),
+        Operator(u8),
     }
+
+    let mut tokens:Vec<Token> = vec!();
+    let mut buffer:Vec<u8> = vec!();
+
+    for c in input{
+
+        if [b'+',b'-'].contains(c){
+            if buffer.len() > 0 {
+                tokens.push(Token::Number(buffer));
+                buffer = vec!();
+            }
+
+            tokens.push(Token::Operator(*c));            
+        }else{
+            buffer.push(*c);
+        }
+
+    }
+    if buffer.len() > 0 {
+        tokens.push(Token::Number(buffer));
+        // buffer = vec!();
+    }
+
+    //check well formed ness
+    //check for empty macro
+    if tokens.len() < 1{
+        eprintln!("Macro parsing error: Empty macro!");
+        exit(1);        
+    }
+
+    //if start with operator eg: -1 the  prepend 0 so -4 becomes 0-4
+    if matches!(tokens[0], Token::Operator(_)){
+        tokens = {let mut x = vec!(Token::Number(vec!(b'0'))); x.extend(tokens); x};
+    }
+
+    //check if macro ends with Number
+    if !matches!(tokens[tokens.len()-1], Token::Number(_)){
+        eprintln!("Macro parsing error: Macro cannot end with operator: [{}]", std::str::from_utf8(input).unwrap());
+        exit(1);    
+    }
+
+    //chekc if macro has format of: number (operator number)*
+    let mut should_be_number = true;
+    for token in &tokens{
+
+        match token{
+            Token::Number(v) => {
+                if !should_be_number{
+                    eprintln!("Macro parsing error: Unexpected (extra) Number in macro: [{}]", std::str::from_utf8(input).unwrap());
+                    exit(1);        
+                }
+            },
+            Token::Operator(b) => {
+                if should_be_number{
+                    eprintln!("Macro parsing error: Unexpected (extra) Operator in macro: [{}]", std::str::from_utf8(input).unwrap());
+                    exit(1);        
+                }
+            },
+        }
+
+        should_be_number = !should_be_number;
+    }
+
+    #[derive(Debug)]
+    enum T2Token{
+        Int(i64),
+        Add,
+        Sub,
+    }
+
+    //Validate all tokens individually, and return a list of T2 tokens
+    fn resolve_tokens(tokens:Vec<Token>, labels:&HashMap<Vec<u8>,usize>) -> Vec<T2Token>{
+        let mut out = vec!();
+
+        for token in &tokens{
+
+            let new_token = match token{
+                Token::Number(v) => {
+
+                    let s = std::str::from_utf8(v).unwrap();
+
+                    let int = match s.parse(){
+                        Ok(int) => int, //int parsed
+                        Err(_) => 
+                            match labels.get(v){
+                                Some(u) => *u as i64,
+                                None => {
+                                    eprintln!("Macro parsing error: Label '{}' not found in labels", s);
+                                    exit(1);                                  
+                                }
+                            }
+                        ,
+                    };
+
+
+                    T2Token::Int(int)
+                }
+                Token::Operator(c) => {
+                    match c{
+                        b'+' => T2Token::Add,
+                        b'-' => T2Token::Sub,
+                        _ => {panic!("INTERPRETER's FAULT: Operator token should only cointain +/- !");}
+                    }
+                }
+            };
+
+            out.push(new_token);
+        }
+
+        out
+
+    }
+
+    let t2tokens = resolve_tokens(tokens,labels);
+
+    // println!("{:?}", t2tokens);
+
+    let mut it = t2tokens.iter();
+
+    let T2Token::Int(mut acc) = it.next().unwrap() else {panic!()};
+
+    loop{
+        let Some(op_token) = it.next() else {break};
+        let T2Token::Int(num) = it.next().unwrap() else {panic!()};
+
+        match op_token{
+            T2Token::Add => {
+                acc += num;
+            },
+            T2Token::Sub => {
+                acc -= num;
+            },
+            T2Token::Int(_) => {panic!();}
+        }
+    }
+
+
+    let ret = format!("!{:064b}", acc);
+    assert!(ret.len() == 65); //Must be 65 characters wide
+
+
+    for token in ret.bytes(){
+        if !TOKENS.contains(&token){
+            panic!("INTERPRETER's FAULT: Invalid tokens in macro output!");
+        }
+    }
+    return Vec::from(ret);
+
+
 
 }
 
