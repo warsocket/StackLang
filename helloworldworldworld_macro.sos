@@ -1,24 +1,26 @@
 #!./target/release/stackofstacks --strict
+#[world+2-3+4+4+4-2]
+
 [3]	#counter, lets print world times
 
 #Now were busy lets skip world to world
 
-[world-postjump]@:postjump
+[world-postjump]@
+:postjump
 
-
-[72].
-[101].
-[108].
-[108].
-[111].
-[32].
-:world
-[87].
-[111].
-[114].
-[108].
-[100].
-[33].
+['H'].
+['e'].
+['l'].
+['l'].
+['o'].
+[' '].
+:worldXX 	#Labels only use lowe case letter so this label reads 'world'
+['W'].
+['o'].
+['r'].
+['l'].
+['d'].
+['!'].
 [10].
 
 [1]-

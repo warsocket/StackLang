@@ -244,15 +244,24 @@ fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>
 
                     let int = match s.parse(){
                         Ok(int) => int, //int parsed
-                        Err(_) => 
-                            match labels.get(v){
-                                Some(u) => *u as i64,
-                                None => {
-                                    eprintln!("Macro parsing error: Label '{}' not found in labels", s);
-                                    exit(1);                                  
-                                }
+                        Err(_) => {
+
+                            let int;
+                            // You want to use from_str_radix. It's implemented on the integer types.
+                            if v.len()==3 && v[0] == b'\'' && v[2] == b'\'' { //matches 'X' nnotation
+                                int = i64::from(v[1]);
+                            }else{
+                                int = match labels.get(v){
+                                    Some(u) => *u as i64,
+                                    None => {
+                                        eprintln!("Macro parsing error: Label '{}' not found in labels", s);
+                                        exit(1);                                  
+                                    }
+                                };                                
                             }
-                        ,
+
+                            int
+                        },
                     };
 
 
