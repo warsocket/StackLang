@@ -248,8 +248,26 @@ fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>
 
                             let int;
                             // You want to use from_str_radix. It's implemented on the integer types.
-                            if v.len()==3 && v[0] == b'\'' && v[2] == b'\'' { //matches 'X' nnotation
+                            if v.len()==3 && v[0] == b'\'' && v[2] == b'\'' { //matches 'X' notation
                                 int = i64::from(v[1]);
+
+                            }else if v[0] == b'0' && (v[1] == b'b' || v[1] == b'x' || v[1] == b'o' || v[1] == b'd'){
+                                let number_string = &s[2..];
+                                let radix = match v[1]{
+                                    b'b' => 2,
+                                    b'o' => 8,
+                                    b'd' => 10, //Just to be complete
+                                    b'x' => 16,
+                                    _ => {panic!();},
+                                };
+
+                                int = match i64::from_str_radix(number_string, radix){
+                                    Ok(i) => i,
+                                    Err(_) => {
+                                        eprintln!("Macro parsing error: '{}' is an invalid number representation", s);
+                                        exit(1);    
+                                    },
+                                }
                             }else{
                                 int = match labels.get(v){
                                     Some(u) => *u as i64,
@@ -405,15 +423,7 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<Token>{
                 // println!("{:}: {:?}", "Macro", std::str::from_utf8(&buffer).unwrap());
                 match token{
                     b']' => {
-                        // let expanded_macro = expand(&buffer, &labels, &pure_script.len());
 
-                        // for token in &expanded_macro{
-                        //     if !TOKENS.contains(&token){
-                        //         panic!("INTERPRETER's FAULT: Invalid tokens in macro output!");
-                        //     }
-                        // }
-                        
-                        //pure_script.extend(expanded_macro);
                         tokenised_script.push(Token::Macro(buffer));
                         buffer = vec!();
 
@@ -429,7 +439,7 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<Token>{
                 if (97 <= token) && (token <= 122){
                     buffer.push(token);
                 }else{
-                    // labels.insert(buffer, pure_script.len());
+
                     tokenised_script.push(Token::Label(buffer));
                     buffer = vec!();
 
@@ -464,19 +474,7 @@ fn tokenise(script_bytes:Vec<u8>) -> Vec<Token>{
 fn parse(tokens:&Vec<Token>) -> Vec<u8>{
 
     let mut labels:HashMap<Vec<u8>, usize> = HashMap::new();
-
-    // let expanded_macro = expand(&buffer, &labels, &pure_script.len());
-
-    // for token in &expanded_macro{
-    //     if !TOKENS.contains(&token){
-    //         panic!("INTERPRETER's FAULT: Invalid tokens in macro output!");
-    //     }
-    // }
-    
-    //pure_script.extend(expanded_macro);
-
     let mut index = 0;
-
     let mut pure_script:Vec<u8> = vec!();
 
     for token in tokens{

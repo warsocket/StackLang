@@ -48,14 +48,8 @@ contexts:
 
     - match: '[+-/*]'
       scope: variable.function
-
-    - match: '([0-9]+[a-z]+)|([a-z]+[0-9]+)'
-      scope: invalid.illegal
-
-    - match: "([0-9a-z]+\'.\')|(\'.\'[0-9a-z]+)"
-      scope: invalid.illegal
-
-    - match: '[0-9]+'
+  
+    - match: '(0x[0-9a-fA-F]+)|(0b[0-1]+)|(0o[0-7]+)|((0d)?[0-9]+)'
       scope: constant.numeric
 
     - match: \'.\'
@@ -63,6 +57,7 @@ contexts:
 
     - match: '[a-z]+'
       scope: entity.name.label
+
 
     - match: '[^\]]+'
       scope: invalid.illegal
